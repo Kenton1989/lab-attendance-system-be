@@ -2,7 +2,7 @@ CREATE DATABASE lab_attendance_system_db IF NOT EXISTS DEFAULT CHARACTER SET utf
 USE lab_attendance_system_db;
 
 CREATE TABLE week_tb IF NOT EXISTS (
-    week_no INTEGER PRIMARY KEY,
+    id INTEGER PRIMARY KEY,
     monday_date DATE NOT NULL
 );
 
@@ -53,13 +53,13 @@ CREATE TABLE group_tb IF NOT EXISTS (
 CREATE TABLE session_info_tb IF NOT EXISTS (
     id INTEGER PRIMARY KEY AUTO_INCREMENT,
     group_id INTEGER NOT NULL FOREIGN KEY REFERENCES group_tb(id),
-    check_in_deadline_minute INTEGER NOT NULL,
+    check_in_ddl_mins INTEGER NOT NULL,
     allow_late_check_in BOOLEAN NOT NULL DEFAULT 1,
     compulsory BOOLEAN NOT NULL DEFAULT 1,
     active BOOLEAN NOT NULL DEFAULT 1
 );
 
-CREATE TABLE normal_session_tb IF NOT EXISTS (
+CREATE TABLE regular_session_tb IF NOT EXISTS (
     id INTEGER NOT NULL FOREIGN KEY REFERENCES session_info_tb(id),
     week INTEGER NOT NULL FOREIGN KEY REFERENCES week_tb(week_no),
     CONSTRAINT one_session_per_week UNIQUE (id, week)
@@ -100,10 +100,11 @@ CREATE TABLE student_tb IF NOT EXISTS (
 );
 
 CREATE TABLE make_up_tb IF NOT EXISTS (
+    id INTEGER NOT NULL PRIMARY KEY AUTO_INCREMENT,
     user_id  INTEGER NOT NULL FOREIGN KEY REFERENCES user_tb(id),
     original_session_id INTEGER NOT NULL FOREIGN KEY REFERENCES session_info_tb(id),
     make_up_session_id INTEGER NOT NULL FOREIGN KEY REFERENCES session_info_tb(id),
-    PRIMARY KEY (original_session, user_id),
+    UNIQUE (original_session, user_id),
     INDEX (make_up_session_id)
 );
 

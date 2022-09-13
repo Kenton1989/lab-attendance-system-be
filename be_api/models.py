@@ -1,25 +1,18 @@
 from django.db import models
 from django.db.models import F, Q
+from django.contrib.auth.models import User
 
 
 class Week(models.Model):
-    monday_date = models.DateTimeField()
+    monday_date = models.DateField()
 
 
-class User(models.Model):
-    username = models.CharField(max_length=16, unique=True)
-    passwd_hash = models.CharField(max_length=64)
+class Profile(models.Model):
+    user = models.OneToOneField(User, on_delete=models.CASCADE)
     fullname = models.CharField(max_length=128)
     email = models.CharField(max_length=128)
     is_staff = models.BooleanField(default=False)
     is_ta = models.BooleanField(default=False)
-    is_admin = models.BooleanField(default=False)
-    active = models.BooleanField(default=True)
-
-    class Meta:
-        indexes = [
-            models.Index(fields=['username']),
-        ]
 
 
 class Lab(models.Model):

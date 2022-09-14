@@ -6,7 +6,7 @@ from django.shortcuts import redirect
 from django.conf import settings
 from .models import Profile, Week, Lab, Course, Group, BaseSession, RegularSession, SpecialSession, MakeUpSession, CheckInRecord
 import traceback
-from django.db.models import Q
+from django.db.models import Q, F
 from django.forms.models import model_to_dict
 from django.core.exceptions import ObjectDoesNotExist
 from django.db.utils import IntegrityError
@@ -648,3 +648,25 @@ def update_record_view(request: HttpRequest, query: dict):
         return bad_request_400()
 
     return ok_resp()
+
+
+@require_login
+def list_record_filters_view(request: HttpRequest):
+    records = CheckInRecord.objects.filter(record_can_read_by(request.user))
+
+    user_cond = (Q(attendance_records__user_id=F('id')) |
+                 Q(attendance_records__session__group__teaching_assistants=F('id')) |
+                 Q(attendance_records__session__group__course__course_coordinators=F('id')) |
+                 Q(attendance_records__session__group__lab__lab_executives=F('id')))
+    users = User.objects.filter(user_cond).values('id', 'username').distinct()
+    course_cond = (Q(groups__sessions__check_in_records__user_id=F('id')) |
+                   Q(groups__sessions__check_in_records__session__group__teaching_assistants=F('id')) |
+                   Q(groups__sessions__check_in_records__session__group__course__course_coordinators=F('id')) |
+                   Q(groups__sessions__check_in_records__session__group__lab__lab_executives=F('id')))
+    courses = Course.objects.filter(
+        course_cond).values('id', 'course_code', 'title').distinct()
+
+    return ok_resp({
+        'users': list(users),
+        'courses': list(courses),
+    })

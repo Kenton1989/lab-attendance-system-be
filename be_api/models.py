@@ -8,9 +8,8 @@ class Week(models.Model):
 
 
 class Profile(models.Model):
-    user = models.OneToOneField(User, on_delete=models.CASCADE)
-    fullname = models.CharField(max_length=128)
-    email = models.CharField(max_length=128)
+    user = models.OneToOneField(
+        User, on_delete=models.CASCADE, related_name='profile')
     is_staff = models.BooleanField(default=False)
     is_ta = models.BooleanField(default=False)
 

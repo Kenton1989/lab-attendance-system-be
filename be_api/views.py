@@ -13,7 +13,7 @@ from django.db.utils import IntegrityError
 import json
 from django.core import serializers
 from django.contrib.auth.hashers import make_password
-from datetime import datetime, time
+from datetime import datetime, date, time, timedelta
 
 VISIBLE_USER_FIELDS = ['id', 'username', 'is_superuser',
                        'email', 'first_name', 'last_name', 'is_staff']
@@ -658,15 +658,93 @@ def list_record_filters_view(request: HttpRequest):
                  Q(attendance_records__session__group__teaching_assistants=F('id')) |
                  Q(attendance_records__session__group__course__course_coordinators=F('id')) |
                  Q(attendance_records__session__group__lab__lab_executives=F('id')))
-    users = User.objects.filter(user_cond).values('id', 'username').distinct()
     course_cond = (Q(groups__sessions__check_in_records__user_id=F('id')) |
                    Q(groups__sessions__check_in_records__session__group__teaching_assistants=F('id')) |
                    Q(groups__sessions__check_in_records__session__group__course__course_coordinators=F('id')) |
                    Q(groups__sessions__check_in_records__session__group__lab__lab_executives=F('id')))
+    users = User.objects.filter(user_cond).values('id', 'username').distinct()
     courses = Course.objects.filter(
         course_cond).values('id', 'course_code', 'title').distinct()
 
     return ok_resp({
         'users': list(users),
         'courses': list(courses),
+    })
+
+
+@require_login
+def records_of_lab_today_view(request: HttpRequest):
+    if 'lab_id' in request.GET:
+        lab_id = int(request.GET['lab_id'])
+    elif 'lab_name' in request.GET:
+        lab_name = str(request.GET['lab_name'])
+        lab = Lab.objects.filter(lab_name=lab_name).first()
+        if not lab:
+            return not_found_404()
+        lab_id = lab.id
+    else:
+        return bad_request_400()
+
+    if not request.user.is_superuser:
+        user = User.objects.filter(
+            lab_executive_of=lab_id, id=request.user.id).first()
+        if not user:
+            return not_found_404()
+
+    today = date.today()
+    week_before = today - timedelta(days=7)
+    week = Week.objects.filter(
+        monday_date__lte=today, monday_date__gt=week_before).first()
+
+    if week:
+        re_sessions = RegularSession.objects.filter(
+            group__lab_id=lab_id, active=True, week=week)
+    else:
+        re_sessions = RegularSession.objects.none()
+    sp_sessions = SpecialSession.objects.filter(
+        lab_id=lab_id, active=True, lab_date=today)
+
+    all_sessions = list(re_sessions) + list(sp_sessions)
+
+    for session in all_sessions:
+        for student in session.group.students.all():
+            if not student.is_active:
+                continue
+            try:
+                CheckInRecord.objects.create(
+                    user=student, session=session, user_type=CheckInRecord.STUDENT,
+                    last_modify_time=datetime.utcnow(), check_in_state=CheckInRecord.ABSENT)
+            except:
+                traceback.print_exc()
+        for ta in session.group.teaching_assistants.all():
+            if not ta.is_active:
+                continue
+            try:
+                CheckInRecord.objects.create(
+                    user=ta, session=session, user_type=CheckInRecord.TA,
+                    last_modify_time=datetime.utcnow(), check_in_state=CheckInRecord.ABSENT)
+            except:
+                traceback.print_exc()
+
+    all_session_id = [s.id for s in all_sessions]
+    records = list(CheckInRecord.objects.filter(
+        session__in=all_session_id,
+    ).distinct().values())
+    groups = list(Group.objects.filter(
+        sessions__in=all_session_id).distinct().values())
+
+    groups_id = [g['id'] for g in groups]
+    courses = list(Course.objects.filter(
+        groups__in=groups_id).distinct().values())
+
+    records_id = [r['id'] for r in records]
+    users = list(User.objects.filter(
+        attendance_records__in=records_id).distinct().values(*VISIBLE_USER_FIELDS))
+
+    return ok_resp({
+        'records': records,
+        'sessions': list(re_sessions.values())+list(sp_sessions.values()),
+        'groups': groups,
+        'courses': courses,
+        'users': users,
     })

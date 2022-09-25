@@ -1,6 +1,7 @@
 from django.db import models
 from django.db.models import F, Q
 from django.contrib.auth.models import User
+import datetime
 
 
 class Week(models.Model):
@@ -169,5 +170,13 @@ class CheckInRecord(models.Model):
     user_type = models.IntegerField(choices=USER_TYPE_CHOICES)
     check_in_state = models.IntegerField(choices=CHECK_IN_STATE_CHOICES)
     check_in_time = models.DateTimeField(null=True)
-    last_modify_time = models.DateTimeField()
+    last_modify_time = models.DateTimeField(
+        default=datetime.datetime(2000, 1, 1))
     remark = models.CharField(max_length=256, blank=True)
+
+    class Meta:
+        constraints = [
+            models.UniqueConstraint(fields=['session', 'user'],
+                                    name='one_record_per_user_per_session',
+                                    violation_error_message='each session each person can has only one record'),
+        ]

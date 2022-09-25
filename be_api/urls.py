@@ -34,4 +34,6 @@ urlpatterns = [
     path('update_record', views.update_record_view, name='update_record'),
     path('list_record_filters', views.list_record_filters_view,
          name='list_record_filters'),
+    path('records_of_lab_today', views.records_of_lab_today_view,
+         name='records_of_lab_today'),
 ]
